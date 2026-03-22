@@ -1,6 +1,6 @@
 # Lnky Short Links
 
-Plugin WordPress MVP v0.1.1 pour creer des liens courts avec :
+Plugin WordPress MVP v0.1.2 pour creer des liens courts avec :
 
 - slug personnalise ou genere automatiquement
 - destination externe
@@ -10,6 +10,7 @@ Plugin WordPress MVP v0.1.1 pour creer des liens courts avec :
 - compteur de clics
 - configuration domaine + sous-domaine + chemin local de test
 - base de configuration SaaS/API pour la future plateforme Lnky
+- synchronisation optionnelle avec l API Lnky
 
 ## Domaine par defaut
 

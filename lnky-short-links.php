@@ -3,7 +3,7 @@
  * Plugin Name: Lnky Short Links
  * Plugin URI: https://example.com/lnky-short-links
  * Description: Cree des liens courts avec slugs personnalises, destinations externes ou contenus WordPress, et redirections trackees.
- * Version: 0.1.1
+ * Version: 0.1.2
  * Author: Le Labo d'Azertaf
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Lnky_Short_Links {
-    private const VERSION = '0.1.1';
+    private const VERSION = '0.1.2';
     private const OPTION_KEY = 'lnky_short_links_settings';
     private const QUERY_VAR = 'lnky_slug';
     private const MENU_SLUG = 'lnky-short-links';
@@ -538,6 +538,19 @@ final class Lnky_Short_Links {
                 <h2><?php echo esc_html__('Etat SaaS / API', 'lnky-short-links'); ?></h2>
                 <?php if ($settings['connection_mode'] === 'api') : ?>
                     <p><?php echo esc_html($this->get_api_readiness_message($settings)); ?></p>
+                    <?php $api_status = $this->fetch_api_status($settings); ?>
+                    <p>
+                        <?php echo esc_html__('Connectivite API :', 'lnky-short-links'); ?>
+                        <strong><?php echo esc_html($api_status['health']); ?></strong>
+                    </p>
+                    <p>
+                        <?php echo esc_html__('Disponibilite du sous-domaine :', 'lnky-short-links'); ?>
+                        <strong><?php echo esc_html($api_status['availability']); ?></strong>
+                    </p>
+                    <p>
+                        <?php echo esc_html__('Workspace distant :', 'lnky-short-links'); ?>
+                        <code><?php echo esc_html($settings['remote_workspace_id'] ?: __('non synchronise', 'lnky-short-links')); ?></code>
+                    </p>
                 <?php else : ?>
                     <p><?php echo esc_html__('Le plugin tourne actuellement en mode autonome. La configuration API peut rester vide tant que la plateforme centrale Lnky n est pas en place.', 'lnky-short-links'); ?></p>
                 <?php endif; ?>
@@ -584,14 +597,27 @@ final class Lnky_Short_Links {
                 'local_base_path' => $local_base_path,
                 'api_base_url' => $api_base_url,
                 'api_key' => $api_key,
+                'remote_workspace_id' => $this->get_settings()['remote_workspace_id'] ?? '',
             ],
             false
         );
 
+        $notice = 'settings_saved';
+
+        if ($connection_mode === 'api' && $workspace_subdomain !== '' && $api_base_url !== '' && $api_key !== '') {
+            $sync_result = $this->sync_workspace_to_api();
+
+            if ($sync_result['ok']) {
+                $notice = 'settings_synced';
+            } else {
+                $notice = 'settings_sync_failed';
+            }
+        }
+
         $this->register_rewrite_rules();
         flush_rewrite_rules();
 
-        wp_safe_redirect(admin_url('admin.php?page=' . self::SETTINGS_MENU_SLUG . '&lnky_notice=settings_saved'));
+        wp_safe_redirect(admin_url('admin.php?page=' . self::SETTINGS_MENU_SLUG . '&lnky_notice=' . $notice));
         exit;
     }
 
@@ -682,6 +708,17 @@ final class Lnky_Short_Links {
             $wpdb->insert($table, $data);
             $link_id = (int) $wpdb->insert_id;
             $notice = 'link_created';
+        }
+
+        if ($this->is_api_mode_enabled()) {
+            $saved_link = $this->get_link($link_id);
+            $sync_result = is_array($saved_link) ? $this->sync_link_to_api($saved_link) : ['ok' => false];
+
+            if (!empty($sync_result['ok'])) {
+                $notice .= '_synced';
+            } else {
+                $notice .= '_sync_failed';
+            }
         }
 
         wp_safe_redirect(admin_url('admin.php?page=' . self::ADD_MENU_SLUG . '&link_id=' . $link_id . '&lnky_notice=' . $notice));
@@ -860,6 +897,7 @@ final class Lnky_Short_Links {
             'local_base_path' => 'lnky',
             'api_base_url' => 'https://api.lnky.fr',
             'api_key' => '',
+            'remote_workspace_id' => '',
         ];
     }
 
@@ -886,6 +924,172 @@ final class Lnky_Short_Links {
         }
 
         return __('La configuration API est renseignee. Il restera a brancher les endpoints de ton service central Lnky pour la reservation de sous-domaines et la synchronisation des liens.', 'lnky-short-links');
+    }
+
+    private function is_api_mode_enabled(): bool {
+        $settings = $this->get_settings();
+
+        return ($settings['connection_mode'] ?? '') === 'api'
+            && !empty($settings['api_base_url'])
+            && !empty($settings['api_key']);
+    }
+
+    private function build_api_url(string $path, array $query = []): string {
+        $settings = $this->get_settings();
+        $base = rtrim((string) ($settings['api_base_url'] ?? ''), '/');
+        $url = $base . $path;
+
+        if (!empty($query)) {
+            $url = add_query_arg($query, $url);
+        }
+
+        return $url;
+    }
+
+    private function api_request(string $method, string $path, array $payload = [], array $query = []): array {
+        $settings = $this->get_settings();
+        $url = $this->build_api_url($path, $query);
+        $args = [
+            'method' => strtoupper($method),
+            'timeout' => 8,
+            'headers' => [
+                'Authorization' => 'Bearer ' . (string) $settings['api_key'],
+                'Content-Type' => 'application/json',
+            ],
+        ];
+
+        if (!empty($payload)) {
+            $args['body'] = wp_json_encode($payload);
+        }
+
+        $response = wp_remote_request($url, $args);
+
+        if (is_wp_error($response)) {
+            return [
+                'ok' => false,
+                'message' => $response->get_error_message(),
+            ];
+        }
+
+        $code = (int) wp_remote_retrieve_response_code($response);
+        $body = (string) wp_remote_retrieve_body($response);
+        $decoded = json_decode($body, true);
+        $data = is_array($decoded) ? $decoded : [];
+
+        if ($code < 200 || $code >= 300) {
+            return [
+                'ok' => false,
+                'message' => $data['detail'] ?? $body ?: __('Erreur API inconnue.', 'lnky-short-links'),
+                'status' => $code,
+                'data' => $data,
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'status' => $code,
+            'data' => $data,
+        ];
+    }
+
+    private function sync_workspace_to_api(): array {
+        if (!$this->is_api_mode_enabled()) {
+            return ['ok' => false, 'message' => __('Mode API non configure.', 'lnky-short-links')];
+        }
+
+        $settings = $this->get_settings();
+        $result = $this->api_request(
+            'POST',
+            '/lnky/v1/workspaces',
+            [
+                'site_url' => home_url('/'),
+                'site_name' => get_bloginfo('name'),
+                'domain' => $settings['selected_domain'],
+                'subdomain' => $settings['workspace_subdomain'],
+            ]
+        );
+
+        if (!$result['ok']) {
+            return $result;
+        }
+
+        $workspace_id = $result['data']['workspace']['id'] ?? '';
+
+        if (is_string($workspace_id) && $workspace_id !== '') {
+            $settings['remote_workspace_id'] = $workspace_id;
+            update_option(self::OPTION_KEY, $settings, false);
+        }
+
+        return $result;
+    }
+
+    private function sync_link_to_api(array $link): array {
+        if (!$this->is_api_mode_enabled()) {
+            return ['ok' => false, 'message' => __('Mode API non configure.', 'lnky-short-links')];
+        }
+
+        $settings = $this->get_settings();
+        $workspace_id = (string) ($settings['remote_workspace_id'] ?? '');
+
+        if ($workspace_id === '') {
+            $workspace_result = $this->sync_workspace_to_api();
+
+            if (!$workspace_result['ok']) {
+                return $workspace_result;
+            }
+
+            $settings = $this->get_settings();
+            $workspace_id = (string) ($settings['remote_workspace_id'] ?? '');
+        }
+
+        if ($workspace_id === '') {
+            return ['ok' => false, 'message' => __('Workspace distant introuvable.', 'lnky-short-links')];
+        }
+
+        return $this->api_request(
+            'POST',
+            '/lnky/v1/links',
+            [
+                'workspace_id' => $workspace_id,
+                'source_link_id' => (int) $link['id'],
+                'slug' => (string) $link['slug'],
+                'destination_url' => (string) $this->resolve_destination_url($link),
+                'destination_label' => (string) ($link['destination_label'] ?? ''),
+                'target_mode' => (string) ($link['target_mode'] ?? 'external'),
+                'target_type' => (string) ($link['target_type'] ?? 'url'),
+                'redirect_type' => (int) ($link['redirect_type'] ?? 302),
+                'is_active' => !empty($link['is_active']),
+            ]
+        );
+    }
+
+    private function fetch_api_status(array $settings): array {
+        if (($settings['connection_mode'] ?? '') !== 'api' || empty($settings['api_base_url']) || empty($settings['api_key'])) {
+            return [
+                'health' => __('non configuree', 'lnky-short-links'),
+                'availability' => __('non verifiee', 'lnky-short-links'),
+            ];
+        }
+
+        $health = $this->api_request('GET', '/lnky/v1/health');
+        $availability = !empty($settings['workspace_subdomain'])
+            ? $this->api_request(
+                'GET',
+                '/lnky/v1/workspaces/availability',
+                [],
+                [
+                    'domain' => $settings['selected_domain'],
+                    'subdomain' => $settings['workspace_subdomain'],
+                ]
+            )
+            : ['ok' => false];
+
+        return [
+            'health' => !empty($health['ok']) ? __('connectee', 'lnky-short-links') : __('hors ligne', 'lnky-short-links'),
+            'availability' => !empty($availability['ok'])
+                ? (!empty($availability['data']['available']) ? __('disponible', 'lnky-short-links') : __('reserve', 'lnky-short-links'))
+                : __('non verifiee', 'lnky-short-links'),
+        ];
     }
 
     private function sanitize_domains_list(string $raw): array {
@@ -1093,8 +1297,14 @@ final class Lnky_Short_Links {
         $notice = sanitize_key((string) wp_unslash($_GET['lnky_notice']));
         $messages = [
             'settings_saved' => __('Reglages enregistres.', 'lnky-short-links'),
+            'settings_synced' => __('Reglages enregistres et workspace synchronise avec l API Lnky.', 'lnky-short-links'),
+            'settings_sync_failed' => __('Reglages enregistres, mais la synchronisation API a echoue.', 'lnky-short-links'),
             'link_created' => __('Lien cree.', 'lnky-short-links'),
             'link_updated' => __('Lien mis a jour.', 'lnky-short-links'),
+            'link_created_synced' => __('Lien cree et synchronise avec l API Lnky.', 'lnky-short-links'),
+            'link_updated_synced' => __('Lien mis a jour et synchronise avec l API Lnky.', 'lnky-short-links'),
+            'link_created_sync_failed' => __('Lien cree localement, mais la synchronisation API a echoue.', 'lnky-short-links'),
+            'link_updated_sync_failed' => __('Lien mis a jour localement, mais la synchronisation API a echoue.', 'lnky-short-links'),
             'link_deleted' => __('Lien supprime.', 'lnky-short-links'),
             'slug_taken' => __('Ce slug est deja utilise.', 'lnky-short-links'),
             'missing_target' => __('Choisis une destination valide.', 'lnky-short-links'),

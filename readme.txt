@@ -4,7 +4,7 @@ Tags: short links, redirects, marketing links, woocommerce, admin
 Requires at least: 6.0
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.1.1
+Stable tag: 0.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -49,6 +49,12 @@ Oui, les reglages de base sont deja prevus : mode API, base URL API et cle API. 
 Non. Le type Produit apparait seulement si WooCommerce est actif.
 
 == Changelog ==
+
+= 0.1.2 =
+
+* Synchronisation optionnelle des workspaces et liens avec l API Lnky.
+* Etat API affiche dans les reglages du plugin.
+* Sauvegarde locale preservee meme si l API ne repond pas.
 
 = 0.1.1 =
 
