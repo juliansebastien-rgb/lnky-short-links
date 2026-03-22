@@ -3,7 +3,7 @@
  * Plugin Name: Lnky Short Links
  * Plugin URI: https://example.com/lnky-short-links
  * Description: Cree des liens courts avec slugs personnalises, destinations externes ou contenus WordPress, et redirections trackees.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: Le Labo d'Azertaf
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Lnky_Short_Links {
-    private const VERSION = '0.1.0';
+    private const VERSION = '0.1.1';
     private const OPTION_KEY = 'lnky_short_links_settings';
     private const QUERY_VAR = 'lnky_slug';
     private const MENU_SLUG = 'lnky-short-links';
@@ -285,11 +285,19 @@ final class Lnky_Short_Links {
                                     <p class="description"><?php echo esc_html__('Laisse vide pour generer automatiquement un slug unique.', 'lnky-short-links'); ?></p>
                                     <p class="description">
                                         <?php echo esc_html__('Apercu public :', 'lnky-short-links'); ?>
-                                        <strong data-lnky-preview-host="<?php echo esc_attr($this->get_public_host()); ?>"><?php echo esc_html($this->build_public_link($link['slug'] ?: 'slug-auto')); ?></strong>
+                                        <strong
+                                            id="lnky_live_public_preview"
+                                            data-lnky-preview-domain="<?php echo esc_attr($settings['selected_domain']); ?>"
+                                            data-lnky-preview-subdomain="<?php echo esc_attr($settings['workspace_subdomain']); ?>"
+                                        ><?php echo esc_html($this->build_public_link($link['slug'] ?: 'slug-auto')); ?></strong>
                                     </p>
                                     <p class="description">
                                         <?php echo esc_html__('Apercu local de test :', 'lnky-short-links'); ?>
-                                        <code><?php echo esc_html($this->build_local_preview_link($link['slug'] ?: 'slug-auto')); ?></code>
+                                        <code
+                                            id="lnky_live_local_preview"
+                                            data-lnky-preview-base-path="<?php echo esc_attr($settings['local_base_path']); ?>"
+                                            data-lnky-preview-home="<?php echo esc_attr(home_url('/')); ?>"
+                                        ><?php echo esc_html($this->build_local_preview_link($link['slug'] ?: 'slug-auto')); ?></code>
                                     </p>
                                 </td>
                             </tr>
@@ -510,8 +518,20 @@ final class Lnky_Short_Links {
 
             <div class="lnky-admin__card">
                 <h2><?php echo esc_html__('Apercu', 'lnky-short-links'); ?></h2>
-                <p><code><?php echo esc_html($this->get_public_host()); ?>/offre</code></p>
-                <p><code><?php echo esc_html($this->build_local_preview_link('offre')); ?></code></p>
+                <p>
+                    <code
+                        id="lnky_settings_public_preview"
+                        data-lnky-settings-domain="<?php echo esc_attr($settings['selected_domain']); ?>"
+                        data-lnky-settings-subdomain="<?php echo esc_attr($settings['workspace_subdomain']); ?>"
+                    ><?php echo esc_html($this->get_public_host()); ?>/offre</code>
+                </p>
+                <p>
+                    <code
+                        id="lnky_settings_local_preview"
+                        data-lnky-settings-base-path="<?php echo esc_attr($settings['local_base_path']); ?>"
+                        data-lnky-settings-home="<?php echo esc_attr(home_url('/')); ?>"
+                    ><?php echo esc_html($this->build_local_preview_link('offre')); ?></code>
+                </p>
             </div>
 
             <div class="lnky-admin__card">

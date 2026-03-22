@@ -10,6 +10,14 @@
 
     onReady(function () {
         var modeInputs = document.querySelectorAll('input[name="target_mode"]');
+        var slugInput = document.getElementById('lnky_slug');
+        var selectedDomainInput = document.getElementById('lnky_selected_domain');
+        var subdomainInput = document.getElementById('lnky_workspace_subdomain');
+        var basePathInput = document.getElementById('lnky_local_base_path');
+        var livePublicPreview = document.getElementById('lnky_live_public_preview');
+        var liveLocalPreview = document.getElementById('lnky_live_local_preview');
+        var settingsPublicPreview = document.getElementById('lnky_settings_public_preview');
+        var settingsLocalPreview = document.getElementById('lnky_settings_local_preview');
         var searchInput = document.getElementById('lnky_internal_search');
         var typeSelect = document.getElementById('lnky_internal_type');
         var resultsBox = document.getElementById('lnky_search_results');
@@ -29,6 +37,80 @@
             document.querySelectorAll('[data-target-mode]').forEach(function (section) {
                 section.hidden = section.getAttribute('data-target-mode') !== modeValue;
             });
+        }
+
+        function sanitizePart(value, fallback) {
+            var normalized = (value || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9-]/g, '')
+                .replace(/^-+|-+$/g, '');
+
+            return normalized || fallback;
+        }
+
+        function trimSlashes(value) {
+            return (value || '').replace(/^\/+|\/+$/g, '');
+        }
+
+        function trimTrailingSlashes(value) {
+            return (value || '').replace(/\/+$/g, '');
+        }
+
+        function updateLinkPreviews() {
+            if (!livePublicPreview && !liveLocalPreview) {
+                return;
+            }
+
+            var slug = sanitizePart(slugInput ? slugInput.value : '', 'slug-auto');
+            var domain = livePublicPreview ? (livePublicPreview.getAttribute('data-lnky-preview-domain') || 'lnky.fr') : 'lnky.fr';
+            var subdomain = livePublicPreview ? sanitizePart(livePublicPreview.getAttribute('data-lnky-preview-subdomain') || '', '') : '';
+            var host = subdomain ? subdomain + '.' + domain : domain;
+
+            if (livePublicPreview) {
+                livePublicPreview.textContent = host + '/' + slug;
+            }
+
+            if (liveLocalPreview) {
+                var basePath = trimSlashes(liveLocalPreview.getAttribute('data-lnky-preview-base-path') || 'lnky');
+                var home = trimTrailingSlashes(liveLocalPreview.getAttribute('data-lnky-preview-home') || '');
+                liveLocalPreview.textContent = home + '/' + basePath + '/' + slug + '/';
+            }
+        }
+
+        function updateSettingsPreviews() {
+            if (!settingsPublicPreview && !settingsLocalPreview) {
+                return;
+            }
+
+            var domain = sanitizePart(selectedDomainInput ? selectedDomainInput.value : '', 'lnkyfr').replace(/-/g, '');
+
+            if (selectedDomainInput && selectedDomainInput.value) {
+                domain = selectedDomainInput.value.trim().toLowerCase();
+            }
+
+            var subdomain = sanitizePart(subdomainInput ? subdomainInput.value : '', '');
+            var basePath = sanitizePart(basePathInput ? basePathInput.value : '', 'lnky');
+            var host = subdomain ? subdomain + '.' + domain : domain;
+
+            if (settingsPublicPreview) {
+                settingsPublicPreview.textContent = host + '/offre';
+            }
+
+            if (settingsLocalPreview) {
+                var home = trimTrailingSlashes(settingsLocalPreview.getAttribute('data-lnky-settings-home') || '');
+                settingsLocalPreview.textContent = home + '/' + basePath + '/offre/';
+            }
+
+            if (livePublicPreview) {
+                livePublicPreview.setAttribute('data-lnky-preview-domain', domain);
+                livePublicPreview.setAttribute('data-lnky-preview-subdomain', subdomain);
+            }
+
+            if (liveLocalPreview) {
+                liveLocalPreview.setAttribute('data-lnky-preview-base-path', basePath);
+            }
+
+            updateLinkPreviews();
         }
 
         function renderSelected(label, url) {
@@ -129,6 +211,24 @@
 
         toggleMode();
         renderSelected(labelInput ? labelInput.value : '', urlInput ? urlInput.value : '');
+        updateSettingsPreviews();
+        updateLinkPreviews();
+
+        if (slugInput) {
+            slugInput.addEventListener('input', updateLinkPreviews);
+        }
+
+        if (selectedDomainInput) {
+            selectedDomainInput.addEventListener('change', updateSettingsPreviews);
+        }
+
+        if (subdomainInput) {
+            subdomainInput.addEventListener('input', updateSettingsPreviews);
+        }
+
+        if (basePathInput) {
+            basePathInput.addEventListener('input', updateSettingsPreviews);
+        }
 
         if (searchInput) {
             searchInput.addEventListener('input', function () {
