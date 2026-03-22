@@ -1,0 +1,21 @@
+services:
+  lnky:
+    image: traefik/whoami
+    restart: unless-stopped
+    networks:
+      - web
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "web"
+
+      traefik.http.routers.lnky.rule: Host(`lnky.fr`) || Host(`www.lnky.fr`) || HostRegexp(`^[a-z0-9-]+\\.lnky\\.fr$`)
+      traefik.http.routers.lnky.entrypoints: websecure
+      traefik.http.routers.lnky.tls: "true"
+      traefik.http.routers.lnky.tls.certresolver: le
+
+      traefik.http.services.lnky.loadbalancer.server.port: "80"
+
+networks:
+  web:
+    external: true
+    name: web

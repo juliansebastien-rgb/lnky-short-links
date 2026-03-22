@@ -1,0 +1,14 @@
+services:
+  api:
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "web"
+      traefik.http.routers.api.rule: Host(`api.mapage-wp.online`) || Host(`api.lnky.fr`)
+      traefik.http.routers.api.entrypoints: web
+      traefik.http.routers.api.middlewares: api-https
+      traefik.http.middlewares.api-https.redirectscheme.scheme: https
+      traefik.http.routers.api-secure.rule: Host(`api.mapage-wp.online`) || Host(`api.lnky.fr`)
+      traefik.http.routers.api-secure.entrypoints: websecure
+      traefik.http.routers.api-secure.tls: "true"
+      traefik.http.routers.api-secure.tls.certresolver: le
+      traefik.http.services.api.loadbalancer.server.port: "8000"
