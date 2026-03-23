@@ -1,15 +1,16 @@
 <?php
 /**
  * Plugin Name: Lnky Short Links
- * Plugin URI: https://example.com/lnky-short-links
+ * Plugin URI: https://github.com/juliansebastien-rgb/lnky-short-links
  * Description: Cree des liens courts avec slugs personnalises, destinations externes ou contenus WordPress, et redirections trackees.
- * Version: 0.1.5
+ * Version: 0.1.6
  * Author: Le Labo d'Azertaf
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: lnky-short-links
+ * Update URI: https://github.com/juliansebastien-rgb/lnky-short-links
  */
 
 if (!defined('ABSPATH')) {
@@ -17,8 +18,13 @@ if (!defined('ABSPATH')) {
 }
 
 final class Lnky_Short_Links {
-    private const VERSION = '0.1.5';
+    private const VERSION = '0.1.6';
     private const OPTION_KEY = 'lnky_short_links_settings';
+    private const TRANSIENT_PREFIX = 'lnky_short_links_';
+    private const GITHUB_REPOSITORY = 'juliansebastien-rgb/lnky-short-links';
+    private const GITHUB_API_BASE = 'https://api.github.com/repos/juliansebastien-rgb/lnky-short-links';
+    private const GITHUB_REPOSITORY_URL = 'https://github.com/juliansebastien-rgb/lnky-short-links';
+    private const UPDATE_CACHE_TTL = HOUR_IN_SECONDS;
     private const QUERY_VAR = 'lnky_slug';
     private const MENU_SLUG = 'lnky-short-links';
     private const ADD_MENU_SLUG = 'lnky-short-links-add';
@@ -41,6 +47,10 @@ final class Lnky_Short_Links {
         add_action('admin_post_lnky_delete_link', [$this, 'handle_delete_link']);
 
         add_filter('plugin_action_links_' . plugin_basename(__FILE__), [$this, 'plugin_action_links']);
+        add_filter('pre_set_site_transient_update_plugins', [$this, 'inject_github_update']);
+        add_filter('plugins_api', [$this, 'filter_plugin_information'], 20, 3);
+        add_filter('upgrader_source_selection', [$this, 'normalize_github_update_source'], 10, 4);
+        add_action('upgrader_process_complete', [$this, 'clear_update_cache'], 10, 2);
     }
 
     public function activate(): void {
@@ -166,6 +176,107 @@ final class Lnky_Short_Links {
         array_unshift($links, $settings_link, $add_link);
 
         return $links;
+    }
+
+    public function inject_github_update($transient) {
+        if (!is_object($transient) || empty($transient->checked)) {
+            return $transient;
+        }
+
+        $release = $this->get_github_release_data();
+        if (!$release || empty($release['version'])) {
+            return $transient;
+        }
+
+        if (version_compare(self::VERSION, $release['version'], '>=')) {
+            return $transient;
+        }
+
+        $plugin_file = plugin_basename(__FILE__);
+        $update = (object) [
+            'slug' => 'lnky-short-links',
+            'plugin' => $plugin_file,
+            'new_version' => $release['version'],
+            'url' => $release['url'],
+            'package' => $release['package'],
+            'icons' => [],
+            'banners' => [],
+            'banners_rtl' => [],
+            'tested' => '6.9',
+            'requires_php' => '7.4',
+            'compatibility' => new stdClass(),
+        ];
+
+        $transient->response[$plugin_file] = $update;
+
+        return $transient;
+    }
+
+    public function filter_plugin_information($result, string $action, $args) {
+        if ($action !== 'plugin_information' || !is_object($args) || empty($args->slug) || $args->slug !== 'lnky-short-links') {
+            return $result;
+        }
+
+        $release = $this->get_github_release_data();
+        if (!$release) {
+            return $result;
+        }
+
+        return (object) [
+            'name' => 'Lnky Short Links',
+            'slug' => 'lnky-short-links',
+            'version' => $release['version'],
+            'author' => '<a href="https://github.com/juliansebastien-rgb">Le Labo d&#039;Azertaf</a>',
+            'author_profile' => 'https://github.com/juliansebastien-rgb',
+            'homepage' => self::GITHUB_REPOSITORY_URL,
+            'requires' => '6.0',
+            'requires_php' => '7.4',
+            'tested' => '6.9',
+            'last_updated' => $release['published_at'],
+            'download_link' => $release['package'],
+            'sections' => [
+                'description' => 'Plugin WordPress SaaS pour creer des liens courts de marque connectes a l API Lnky.',
+                'installation' => 'Installe le zip de release, active le plugin, puis configure le domaine, le sous-domaine et la connexion API dans Lnky Links > Reglages.',
+                'changelog' => sprintf("= %s =\n* GitHub release package.\n", $release['version']),
+            ],
+            'banners' => [],
+            'icons' => [],
+        ];
+    }
+
+    public function clear_update_cache($upgrader, array $hook_extra): void {
+        if (($hook_extra['type'] ?? '') !== 'plugin') {
+            return;
+        }
+
+        $plugins = $hook_extra['plugins'] ?? [];
+
+        if (in_array(plugin_basename(__FILE__), $plugins, true)) {
+            delete_transient(self::TRANSIENT_PREFIX . 'github_release');
+        }
+    }
+
+    public function normalize_github_update_source(string $source, string $remote_source, $upgrader, array $hook_extra): string {
+        if (($hook_extra['type'] ?? '') !== 'plugin') {
+            return $source;
+        }
+
+        $plugins = $hook_extra['plugins'] ?? [];
+        if (!in_array(plugin_basename(__FILE__), $plugins, true)) {
+            return $source;
+        }
+
+        $normalized = trailingslashit($remote_source) . 'lnky-short-links';
+
+        if ($source === $normalized || !is_dir($source)) {
+            return $source;
+        }
+
+        if (@rename($source, $normalized)) {
+            return $normalized;
+        }
+
+        return $source;
     }
 
     public function render_admin_brand(string $title, string $description = ''): void {
@@ -1047,6 +1158,100 @@ final class Lnky_Short_Links {
                 ? (!empty($availability['data']['available']) ? __('disponible', 'lnky-short-links') : __('reserve', 'lnky-short-links'))
                 : __('non verifiee', 'lnky-short-links'),
         ];
+    }
+
+    private function get_github_release_data(): ?array {
+        $cache_key = self::TRANSIENT_PREFIX . 'github_release';
+        $cached = get_transient($cache_key);
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $release = $this->request_github_release('/releases/latest');
+
+        if (!$release) {
+            $tag = $this->request_github_release('/tags');
+            if (!$tag || empty($tag[0]['name'])) {
+                return null;
+            }
+
+            $first_tag = $tag[0];
+            $release = [
+                'tag_name' => $first_tag['name'],
+                'zipball_url' => self::GITHUB_API_BASE . '/zipball/' . rawurlencode($first_tag['name']),
+                'html_url' => self::GITHUB_REPOSITORY_URL . '/releases/tag/' . rawurlencode($first_tag['name']),
+                'published_at' => gmdate('Y-m-d H:i:s'),
+                'body' => '',
+            ];
+        }
+
+        if (empty($release['tag_name'])) {
+            return null;
+        }
+
+        $package = '';
+        if (!empty($release['assets']) && is_array($release['assets'])) {
+            foreach ($release['assets'] as $asset) {
+                if (!is_array($asset)) {
+                    continue;
+                }
+
+                $name = isset($asset['name']) ? (string) $asset['name'] : '';
+                $download = isset($asset['browser_download_url']) ? (string) $asset['browser_download_url'] : '';
+
+                if ($name !== '' && substr($name, -4) === '.zip' && $download !== '') {
+                    $package = $download;
+                    break;
+                }
+            }
+        }
+
+        if ($package === '' && !empty($release['zipball_url'])) {
+            $package = (string) $release['zipball_url'];
+        }
+
+        if ($package === '') {
+            return null;
+        }
+
+        $data = [
+            'version' => ltrim((string) $release['tag_name'], 'v'),
+            'package' => $package,
+            'url' => !empty($release['html_url']) ? (string) $release['html_url'] : self::GITHUB_REPOSITORY_URL,
+            'published_at' => !empty($release['published_at']) ? gmdate('Y-m-d H:i:s', strtotime((string) $release['published_at'])) : gmdate('Y-m-d H:i:s'),
+            'body' => !empty($release['body']) ? (string) $release['body'] : '',
+        ];
+
+        set_transient($cache_key, $data, self::UPDATE_CACHE_TTL);
+
+        return $data;
+    }
+
+    private function request_github_release(string $path) {
+        $response = wp_remote_get(
+            self::GITHUB_API_BASE . $path,
+            [
+                'timeout' => 15,
+                'headers' => [
+                    'Accept' => 'application/vnd.github+json',
+                    'User-Agent' => 'Lnky Short Links/' . self::VERSION . '; ' . home_url('/'),
+                ],
+            ]
+        );
+
+        if (is_wp_error($response)) {
+            return null;
+        }
+
+        $code = (int) wp_remote_retrieve_response_code($response);
+        if ($code < 200 || $code >= 300) {
+            return null;
+        }
+
+        $data = json_decode((string) wp_remote_retrieve_body($response), true);
+
+        return is_array($data) ? $data : null;
     }
 
     private function sanitize_domains_list(string $raw): array {

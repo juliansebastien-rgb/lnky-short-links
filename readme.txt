@@ -4,7 +4,7 @@ Tags: short links, redirects, marketing links, woocommerce, admin
 Requires at least: 6.0
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.1.5
+Stable tag: 0.1.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -55,6 +55,10 @@ Oui. Le plugin se connecte directement a `api.lnky.fr` et l utilisateur n a pas 
 Non. Le type Produit apparait seulement si WooCommerce est actif.
 
 == Changelog ==
+
+= 0.1.6 =
+
+* Ajout du mecanisme de mise a jour GitHub pour proposer les nouvelles releases directement dans WordPress.
 
 = 0.1.5 =
 
