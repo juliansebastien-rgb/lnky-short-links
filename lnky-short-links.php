@@ -3,7 +3,7 @@
  * Plugin Name: Lnky Short Links
  * Plugin URI: https://example.com/lnky-short-links
  * Description: Cree des liens courts avec slugs personnalises, destinations externes ou contenus WordPress, et redirections trackees.
- * Version: 0.1.4
+ * Version: 0.1.5
  * Author: Le Labo d'Azertaf
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Lnky_Short_Links {
-    private const VERSION = '0.1.4';
+    private const VERSION = '0.1.5';
     private const OPTION_KEY = 'lnky_short_links_settings';
     private const QUERY_VAR = 'lnky_slug';
     private const MENU_SLUG = 'lnky-short-links';
@@ -168,6 +168,21 @@ final class Lnky_Short_Links {
         return $links;
     }
 
+    public function render_admin_brand(string $title, string $description = ''): void {
+        $logo_url = plugin_dir_url(__FILE__) . 'assets/images/logo-lnky-short-links.png';
+        ?>
+        <div class="lnky-admin__brand">
+            <img class="lnky-admin__brand-logo" src="<?php echo esc_url($logo_url); ?>" alt="<?php echo esc_attr__('Logo Lnky Short Links', 'lnky-short-links'); ?>">
+            <div class="lnky-admin__brand-copy">
+                <h1><?php echo esc_html($title); ?></h1>
+                <?php if ($description !== '') : ?>
+                    <p><?php echo esc_html($description); ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php
+    }
+
     public function render_links_page(): void {
         if (!current_user_can('manage_options')) {
             return;
@@ -176,7 +191,7 @@ final class Lnky_Short_Links {
         $links = $this->get_links();
         ?>
         <div class="wrap lnky-admin">
-            <h1><?php echo esc_html__('Lnky Links', 'lnky-short-links'); ?></h1>
+            <?php $this->render_admin_brand(__('Lnky Links', 'lnky-short-links'), __('Gere tes liens courts, tes destinations et tes clics depuis WordPress.', 'lnky-short-links')); ?>
             <?php $this->render_admin_notices(); ?>
 
             <div class="lnky-admin__hero">
@@ -266,7 +281,7 @@ final class Lnky_Short_Links {
         $can_use_products = $this->is_woocommerce_active();
         ?>
         <div class="wrap lnky-admin">
-            <h1><?php echo $link['id'] ? esc_html__('Modifier le lien', 'lnky-short-links') : esc_html__('Ajouter un lien', 'lnky-short-links'); ?></h1>
+            <?php $this->render_admin_brand($link['id'] ? __('Modifier le lien', 'lnky-short-links') : __('Ajouter un lien', 'lnky-short-links'), __('Configure un slug, choisis la destination et regle la redirection.', 'lnky-short-links')); ?>
             <?php $this->render_admin_notices(); ?>
 
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="lnky-admin__form">
@@ -426,7 +441,7 @@ final class Lnky_Short_Links {
         $suggestion = $this->generate_subdomain_suggestion();
         ?>
         <div class="wrap lnky-admin">
-            <h1><?php echo esc_html__('Reglages Lnky', 'lnky-short-links'); ?></h1>
+            <?php $this->render_admin_brand(__('Reglages Lnky', 'lnky-short-links'), __('Relie ton site a Lnky et configure ton espace de liens de marque.', 'lnky-short-links')); ?>
             <?php $this->render_admin_notices(); ?>
 
             <div class="lnky-admin__card">
