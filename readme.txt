@@ -4,7 +4,7 @@ Tags: short links, redirects, marketing links, woocommerce, admin
 Requires at least: 6.0
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.1.2
+Stable tag: 0.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,18 +20,16 @@ Lnky Short Links ajoute une interface d administration simple pour :
 - rediriger vers une URL externe
 - rediriger vers une page, un article ou un produit WooCommerce
 - compter les clics
-- preparer une future connexion a l API Lnky
+- connecter directement WordPress a l API Lnky
 
 Le plugin est preconfigure pour utiliser `lnky.fr` comme domaine principal par defaut.
-
-Le plugin inclut aussi un chemin local de test pour faire fonctionner les redirections sans infra externe.
 
 == Installation ==
 
 1. Uploade le dossier `lnky-short-links` dans `/wp-content/plugins/`
 2. Active le plugin dans WordPress
 3. Ouvre `Lnky Links > Reglages`
-4. Configure le domaine, le sous-domaine et le chemin local de test
+4. Configure le domaine, le sous-domaine et la base API
 5. Cree ton premier lien
 
 == Frequently Asked Questions ==
@@ -40,15 +38,21 @@ Le plugin inclut aussi un chemin local de test pour faire fonctionner les redire
 
 Non. Il sait utiliser un sous-domaine si celui-ci pointe deja vers le meme WordPress. Pour des sous-domaines dynamiques a grande echelle, il faut une infra centrale avec wildcard DNS et SSL.
 
-= Le plugin est-il deja pret pour une API SaaS ? =
+= Le plugin est-il deja connecte a l API SaaS ? =
 
-Oui, les reglages de base sont deja prevus : mode API, base URL API et cle API. Les endpoints restent a brancher dans une prochaine version.
+Oui. Le plugin se connecte directement a `api.lnky.fr` et l utilisateur n a pas besoin de saisir un token.
 
 = Est-ce que WooCommerce est obligatoire ? =
 
 Non. Le type Produit apparait seulement si WooCommerce est actif.
 
 == Changelog ==
+
+= 0.1.3 =
+
+* Suppression des references au mode autonome dans l interface utilisateur.
+* Connexion directe a l API Lnky sans saisie de token utilisateur.
+* Experience plugin simplifiee en mode SaaS uniquement.
 
 = 0.1.2 =
 

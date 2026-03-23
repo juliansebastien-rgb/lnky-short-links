@@ -3,7 +3,7 @@
  * Plugin Name: Lnky Short Links
  * Plugin URI: https://example.com/lnky-short-links
  * Description: Cree des liens courts avec slugs personnalises, destinations externes ou contenus WordPress, et redirections trackees.
- * Version: 0.1.2
+ * Version: 0.1.3
  * Author: Le Labo d'Azertaf
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Lnky_Short_Links {
-    private const VERSION = '0.1.2';
+    private const VERSION = '0.1.3';
     private const OPTION_KEY = 'lnky_short_links_settings';
     private const QUERY_VAR = 'lnky_slug';
     private const MENU_SLUG = 'lnky-short-links';
@@ -211,7 +211,7 @@ final class Lnky_Short_Links {
                             <tr>
                                 <td>
                                     <strong><?php echo esc_html($this->build_public_link($link['slug'])); ?></strong><br>
-                                    <code><?php echo esc_html($this->build_local_preview_link($link['slug'])); ?></code>
+                                    <code><?php echo esc_html__('URL geree par l API Lnky', 'lnky-short-links'); ?></code>
                                 </td>
                                 <td>
                                     <a href="<?php echo esc_url($link['destination_url']); ?>" target="_blank" rel="noopener noreferrer">
@@ -290,14 +290,6 @@ final class Lnky_Short_Links {
                                             data-lnky-preview-domain="<?php echo esc_attr($settings['selected_domain']); ?>"
                                             data-lnky-preview-subdomain="<?php echo esc_attr($settings['workspace_subdomain']); ?>"
                                         ><?php echo esc_html($this->build_public_link($link['slug'] ?: 'slug-auto')); ?></strong>
-                                    </p>
-                                    <p class="description">
-                                        <?php echo esc_html__('Apercu local de test :', 'lnky-short-links'); ?>
-                                        <code
-                                            id="lnky_live_local_preview"
-                                            data-lnky-preview-base-path="<?php echo esc_attr($settings['local_base_path']); ?>"
-                                            data-lnky-preview-home="<?php echo esc_attr(home_url('/')); ?>"
-                                        ><?php echo esc_html($this->build_local_preview_link($link['slug'] ?: 'slug-auto')); ?></code>
                                     </p>
                                 </td>
                             </tr>
@@ -404,10 +396,6 @@ final class Lnky_Short_Links {
             <div class="lnky-admin__card">
                 <h2><?php echo esc_html__('Configuration actuelle', 'lnky-short-links'); ?></h2>
                 <p>
-                    <?php echo esc_html__('Mode :', 'lnky-short-links'); ?>
-                    <strong><?php echo esc_html($settings['connection_mode'] === 'api' ? __('SaaS / API', 'lnky-short-links') : __('Autonome WordPress', 'lnky-short-links')); ?></strong>
-                </p>
-                <p>
                     <?php echo esc_html__('Domaine choisi :', 'lnky-short-links'); ?>
                     <strong><?php echo esc_html($settings['selected_domain']); ?></strong>
                 </p>
@@ -449,16 +437,6 @@ final class Lnky_Short_Links {
                     <table class="form-table" role="presentation">
                         <tbody>
                             <tr>
-                                <th scope="row"><label for="lnky_connection_mode"><?php echo esc_html__('Mode de fonctionnement', 'lnky-short-links'); ?></label></th>
-                                <td>
-                                    <select id="lnky_connection_mode" name="connection_mode">
-                                        <option value="standalone" <?php selected($settings['connection_mode'], 'standalone'); ?>><?php echo esc_html__('Autonome WordPress', 'lnky-short-links'); ?></option>
-                                        <option value="api" <?php selected($settings['connection_mode'], 'api'); ?>><?php echo esc_html__('SaaS / API centrale', 'lnky-short-links'); ?></option>
-                                    </select>
-                                    <p class="description"><?php echo esc_html__('Le mode autonome gere les redirections localement. Le mode API prepare la connexion future a ton service central Lnky.', 'lnky-short-links'); ?></p>
-                                </td>
-                            </tr>
-                            <tr>
                                 <th scope="row"><label for="lnky_available_domains"><?php echo esc_html__('Domaines disponibles', 'lnky-short-links'); ?></label></th>
                                 <td>
                                     <textarea id="lnky_available_domains" name="available_domains" class="large-text code" rows="5"><?php echo esc_textarea(implode("\n", $settings['available_domains'])); ?></textarea>
@@ -487,24 +465,10 @@ final class Lnky_Short_Links {
                                 </td>
                             </tr>
                             <tr>
-                                <th scope="row"><label for="lnky_local_base_path"><?php echo esc_html__('Chemin local de test', 'lnky-short-links'); ?></label></th>
-                                <td>
-                                    <input type="text" id="lnky_local_base_path" name="local_base_path" class="regular-text" value="<?php echo esc_attr($settings['local_base_path']); ?>" placeholder="lnky">
-                                    <p class="description"><?php echo esc_html__('Permet de tester les redirections sur le site WordPress actuel, par exemple /lnky/promo.', 'lnky-short-links'); ?></p>
-                                </td>
-                            </tr>
-                            <tr>
                                 <th scope="row"><label for="lnky_api_base_url"><?php echo esc_html__('Base URL API', 'lnky-short-links'); ?></label></th>
                                 <td>
                                     <input type="url" id="lnky_api_base_url" name="api_base_url" class="regular-text code" value="<?php echo esc_attr($settings['api_base_url']); ?>" placeholder="https://api.lnky.fr">
-                                    <p class="description"><?php echo esc_html__('Prevu pour la future plateforme centrale qui gerera les sous-domaines dynamiques et la synchronisation des liens.', 'lnky-short-links'); ?></p>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th scope="row"><label for="lnky_api_key"><?php echo esc_html__('Cle API', 'lnky-short-links'); ?></label></th>
-                                <td>
-                                    <input type="text" id="lnky_api_key" name="api_key" class="regular-text code" value="<?php echo esc_attr($settings['api_key']); ?>" placeholder="lnky_live_xxx">
-                                    <p class="description"><?php echo esc_html__('Champ deja pret pour l authentification future du plugin vers ton service Lnky.', 'lnky-short-links'); ?></p>
+                                    <p class="description"><?php echo esc_html__('Le plugin se connecte directement a l API Lnky. Aucun token n est demande a l utilisateur.', 'lnky-short-links'); ?></p>
                                 </td>
                             </tr>
                         </tbody>
@@ -525,35 +489,24 @@ final class Lnky_Short_Links {
                         data-lnky-settings-subdomain="<?php echo esc_attr($settings['workspace_subdomain']); ?>"
                     ><?php echo esc_html($this->get_public_host()); ?>/offre</code>
                 </p>
-                <p>
-                    <code
-                        id="lnky_settings_local_preview"
-                        data-lnky-settings-base-path="<?php echo esc_attr($settings['local_base_path']); ?>"
-                        data-lnky-settings-home="<?php echo esc_attr(home_url('/')); ?>"
-                    ><?php echo esc_html($this->build_local_preview_link('offre')); ?></code>
-                </p>
             </div>
 
             <div class="lnky-admin__card">
                 <h2><?php echo esc_html__('Etat SaaS / API', 'lnky-short-links'); ?></h2>
-                <?php if ($settings['connection_mode'] === 'api') : ?>
-                    <p><?php echo esc_html($this->get_api_readiness_message($settings)); ?></p>
-                    <?php $api_status = $this->fetch_api_status($settings); ?>
-                    <p>
-                        <?php echo esc_html__('Connectivite API :', 'lnky-short-links'); ?>
-                        <strong><?php echo esc_html($api_status['health']); ?></strong>
-                    </p>
-                    <p>
-                        <?php echo esc_html__('Disponibilite du sous-domaine :', 'lnky-short-links'); ?>
-                        <strong><?php echo esc_html($api_status['availability']); ?></strong>
-                    </p>
-                    <p>
-                        <?php echo esc_html__('Workspace distant :', 'lnky-short-links'); ?>
-                        <code><?php echo esc_html($settings['remote_workspace_id'] ?: __('non synchronise', 'lnky-short-links')); ?></code>
-                    </p>
-                <?php else : ?>
-                    <p><?php echo esc_html__('Le plugin tourne actuellement en mode autonome. La configuration API peut rester vide tant que la plateforme centrale Lnky n est pas en place.', 'lnky-short-links'); ?></p>
-                <?php endif; ?>
+                <p><?php echo esc_html($this->get_api_readiness_message($settings)); ?></p>
+                <?php $api_status = $this->fetch_api_status($settings); ?>
+                <p>
+                    <?php echo esc_html__('Connectivite API :', 'lnky-short-links'); ?>
+                    <strong><?php echo esc_html($api_status['health']); ?></strong>
+                </p>
+                <p>
+                    <?php echo esc_html__('Disponibilite du sous-domaine :', 'lnky-short-links'); ?>
+                    <strong><?php echo esc_html($api_status['availability']); ?></strong>
+                </p>
+                <p>
+                    <?php echo esc_html__('Workspace distant :', 'lnky-short-links'); ?>
+                    <code><?php echo esc_html($settings['remote_workspace_id'] ?: __('non synchronise', 'lnky-short-links')); ?></code>
+                </p>
             </div>
         </div>
         <?php
@@ -568,16 +521,9 @@ final class Lnky_Short_Links {
 
         $available_domains_raw = isset($_POST['available_domains']) ? (string) wp_unslash($_POST['available_domains']) : '';
         $available_domains = $this->sanitize_domains_list($available_domains_raw);
-        $connection_mode = isset($_POST['connection_mode']) ? sanitize_key((string) wp_unslash($_POST['connection_mode'])) : 'standalone';
         $selected_domain = isset($_POST['selected_domain']) ? strtolower((string) wp_unslash($_POST['selected_domain'])) : '';
         $workspace_subdomain = isset($_POST['workspace_subdomain']) ? $this->sanitize_subdomain((string) wp_unslash($_POST['workspace_subdomain'])) : '';
-        $local_base_path = isset($_POST['local_base_path']) ? $this->sanitize_base_path((string) wp_unslash($_POST['local_base_path'])) : 'lnky';
         $api_base_url = isset($_POST['api_base_url']) ? esc_url_raw((string) wp_unslash($_POST['api_base_url'])) : '';
-        $api_key = isset($_POST['api_key']) ? sanitize_text_field((string) wp_unslash($_POST['api_key'])) : '';
-
-        if (!in_array($connection_mode, ['standalone', 'api'], true)) {
-            $connection_mode = 'standalone';
-        }
 
         if (empty($available_domains)) {
             $available_domains = $this->get_default_settings()['available_domains'];
@@ -590,13 +536,13 @@ final class Lnky_Short_Links {
         update_option(
             self::OPTION_KEY,
             [
-                'connection_mode' => $connection_mode,
+                'connection_mode' => 'api',
                 'available_domains' => $available_domains,
                 'selected_domain' => $selected_domain,
                 'workspace_subdomain' => $workspace_subdomain,
-                'local_base_path' => $local_base_path,
+                'local_base_path' => $this->get_settings()['local_base_path'] ?? 'lnky',
                 'api_base_url' => $api_base_url,
-                'api_key' => $api_key,
+                'api_key' => '',
                 'remote_workspace_id' => $this->get_settings()['remote_workspace_id'] ?? '',
             ],
             false
@@ -604,7 +550,7 @@ final class Lnky_Short_Links {
 
         $notice = 'settings_saved';
 
-        if ($connection_mode === 'api' && $workspace_subdomain !== '' && $api_base_url !== '' && $api_key !== '') {
+        if ($workspace_subdomain !== '' && $api_base_url !== '') {
             $sync_result = $this->sync_workspace_to_api();
 
             if ($sync_result['ok']) {
@@ -890,7 +836,7 @@ final class Lnky_Short_Links {
 
     private function get_default_settings(): array {
         return [
-            'connection_mode' => 'standalone',
+            'connection_mode' => 'api',
             'available_domains' => ['lnky.fr'],
             'selected_domain' => 'lnky.fr',
             'workspace_subdomain' => '',
@@ -909,29 +855,17 @@ final class Lnky_Short_Links {
 
     private function get_api_readiness_message(array $settings): string {
         $api_base_url = (string) ($settings['api_base_url'] ?? '');
-        $api_key = (string) ($settings['api_key'] ?? '');
-
-        if ($api_base_url === '' && $api_key === '') {
-            return __('Mode API active, mais la base URL et la cle API ne sont pas encore renseignees.', 'lnky-short-links');
-        }
-
         if ($api_base_url === '') {
-            return __('Mode API active, mais la base URL API manque encore.', 'lnky-short-links');
+            return __('La base URL API Lnky n est pas encore renseignee.', 'lnky-short-links');
         }
 
-        if ($api_key === '') {
-            return __('Mode API active, mais la cle API manque encore.', 'lnky-short-links');
-        }
-
-        return __('La configuration API est renseignee. Il restera a brancher les endpoints de ton service central Lnky pour la reservation de sous-domaines et la synchronisation des liens.', 'lnky-short-links');
+        return __('Le plugin fonctionne uniquement en mode SaaS et se connecte directement a l API Lnky.', 'lnky-short-links');
     }
 
     private function is_api_mode_enabled(): bool {
         $settings = $this->get_settings();
 
-        return ($settings['connection_mode'] ?? '') === 'api'
-            && !empty($settings['api_base_url'])
-            && !empty($settings['api_key']);
+        return !empty($settings['api_base_url']);
     }
 
     private function build_api_url(string $path, array $query = []): string {
@@ -953,10 +887,13 @@ final class Lnky_Short_Links {
             'method' => strtoupper($method),
             'timeout' => 8,
             'headers' => [
-                'Authorization' => 'Bearer ' . (string) $settings['api_key'],
                 'Content-Type' => 'application/json',
             ],
         ];
+
+        if (!empty($settings['api_key'])) {
+            $args['headers']['Authorization'] = 'Bearer ' . (string) $settings['api_key'];
+        }
 
         if (!empty($payload)) {
             $args['body'] = wp_json_encode($payload);
@@ -1064,7 +1001,7 @@ final class Lnky_Short_Links {
     }
 
     private function fetch_api_status(array $settings): array {
-        if (($settings['connection_mode'] ?? '') !== 'api' || empty($settings['api_base_url']) || empty($settings['api_key'])) {
+        if (empty($settings['api_base_url'])) {
             return [
                 'health' => __('non configuree', 'lnky-short-links'),
                 'availability' => __('non verifiee', 'lnky-short-links'),
@@ -1303,8 +1240,8 @@ final class Lnky_Short_Links {
             'link_updated' => __('Lien mis a jour.', 'lnky-short-links'),
             'link_created_synced' => __('Lien cree et synchronise avec l API Lnky.', 'lnky-short-links'),
             'link_updated_synced' => __('Lien mis a jour et synchronise avec l API Lnky.', 'lnky-short-links'),
-            'link_created_sync_failed' => __('Lien cree localement, mais la synchronisation API a echoue.', 'lnky-short-links'),
-            'link_updated_sync_failed' => __('Lien mis a jour localement, mais la synchronisation API a echoue.', 'lnky-short-links'),
+            'link_created_sync_failed' => __('Lien cree dans WordPress, mais la synchronisation API a echoue.', 'lnky-short-links'),
+            'link_updated_sync_failed' => __('Lien mis a jour dans WordPress, mais la synchronisation API a echoue.', 'lnky-short-links'),
             'link_deleted' => __('Lien supprime.', 'lnky-short-links'),
             'slug_taken' => __('Ce slug est deja utilise.', 'lnky-short-links'),
             'missing_target' => __('Choisis une destination valide.', 'lnky-short-links'),
