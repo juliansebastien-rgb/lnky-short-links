@@ -69,3 +69,21 @@
     background: #f6f7f7;
     border-radius: 8px;
 }
+
+.lnky-admin__hint-list {
+    margin-top: 10px;
+    max-width: 760px;
+    padding: 12px 14px;
+    background: #f6f7f7;
+    border-radius: 8px;
+}
+
+.lnky-admin__hint-list p {
+    margin: 0 0 8px;
+    color: #50575e;
+    line-height: 1.5;
+}
+
+.lnky-admin__hint-list p:last-child {
+    margin-bottom: 0;
+}

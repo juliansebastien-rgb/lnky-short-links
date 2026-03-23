@@ -3,7 +3,7 @@
  * Plugin Name: Lnky Short Links
  * Plugin URI: https://example.com/lnky-short-links
  * Description: Cree des liens courts avec slugs personnalises, destinations externes ou contenus WordPress, et redirections trackees.
- * Version: 0.1.3
+ * Version: 0.1.4
  * Author: Le Labo d'Azertaf
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Lnky_Short_Links {
-    private const VERSION = '0.1.3';
+    private const VERSION = '0.1.4';
     private const OPTION_KEY = 'lnky_short_links_settings';
     private const QUERY_VAR = 'lnky_slug';
     private const MENU_SLUG = 'lnky-short-links';
@@ -301,6 +301,11 @@ final class Lnky_Short_Links {
                                         <option value="302" <?php selected((int) $link['redirect_type'], 302); ?>>302</option>
                                         <option value="307" <?php selected((int) $link['redirect_type'], 307); ?>>307</option>
                                     </select>
+                                    <div class="lnky-admin__hint-list">
+                                        <p><strong><?php echo esc_html__('301', 'lnky-short-links'); ?></strong> <?php echo esc_html__('redirection permanente. A utiliser si le lien court doit toujours pointer vers la meme destination. C est le meilleur choix pour une URL stable.', 'lnky-short-links'); ?></p>
+                                        <p><strong><?php echo esc_html__('302', 'lnky-short-links'); ?></strong> <?php echo esc_html__('redirection temporaire. A utiliser si la destination peut changer plus tard. C est le choix le plus souple pour le marketing et les tests.', 'lnky-short-links'); ?></p>
+                                        <p><strong><?php echo esc_html__('307', 'lnky-short-links'); ?></strong> <?php echo esc_html__('redirection temporaire stricte. Plus technique, utile si tu veux conserver exactement la methode de requete. En pratique, 302 suffit dans la plupart des cas.', 'lnky-short-links'); ?></p>
+                                    </div>
                                 </td>
                             </tr>
                             <tr>

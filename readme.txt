@@ -4,7 +4,7 @@ Tags: short links, redirects, marketing links, woocommerce, admin
 Requires at least: 6.0
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.1.3
+Stable tag: 0.1.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -42,11 +42,23 @@ Non. Il sait utiliser un sous-domaine si celui-ci pointe deja vers le meme WordP
 
 Oui. Le plugin se connecte directement a `api.lnky.fr` et l utilisateur n a pas besoin de saisir un token.
 
+= Quelle redirection choisir : 301, 302 ou 307 ? =
+
+301 = permanente, pour une destination stable.
+
+302 = temporaire, recommandee dans la plupart des cas marketing.
+
+307 = temporaire stricte, plus technique.
+
 = Est-ce que WooCommerce est obligatoire ? =
 
 Non. Le type Produit apparait seulement si WooCommerce est actif.
 
 == Changelog ==
+
+= 0.1.4 =
+
+* Explication ajoutee dans l admin pour aider a choisir entre 301, 302 et 307.
 
 = 0.1.3 =
 
