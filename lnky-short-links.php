@@ -3,7 +3,7 @@
  * Plugin Name: Lnky Short Links
  * Plugin URI: https://github.com/juliansebastien-rgb/lnky-short-links
  * Description: Cree des liens courts avec slugs personnalises, destinations externes ou contenus WordPress, et redirections trackees.
- * Version: 0.1.6
+ * Version: 0.1.8
  * Author: Le Labo d'Azertaf
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Lnky_Short_Links {
-    private const VERSION = '0.1.6';
+    private const VERSION = '0.1.8';
     private const OPTION_KEY = 'lnky_short_links_settings';
     private const TRANSIENT_PREFIX = 'lnky_short_links_';
     private const GITHUB_REPOSITORY = 'juliansebastien-rgb/lnky-short-links';
@@ -145,9 +145,17 @@ final class Lnky_Short_Links {
         );
 
         wp_enqueue_script(
+            'lnky-short-links-qrcode',
+            plugin_dir_url(__FILE__) . 'assets/js/qrcode-lib.js',
+            [],
+            self::VERSION,
+            true
+        );
+
+        wp_enqueue_script(
             'lnky-short-links-admin',
             plugin_dir_url(__FILE__) . 'assets/js/admin.js',
-            [],
+            ['lnky-short-links-qrcode'],
             self::VERSION,
             true
         );
@@ -164,6 +172,9 @@ final class Lnky_Short_Links {
                     'empty' => __('Aucun resultat.', 'lnky-short-links'),
                     'pick' => __('Choisir', 'lnky-short-links'),
                     'needsMore' => __('Tape au moins 2 caracteres.', 'lnky-short-links'),
+                ],
+                'qr' => [
+                    'logoUrl' => $this->get_qr_logo_url(),
                 ],
             ]
         );
@@ -324,13 +335,14 @@ final class Lnky_Short_Links {
                         <th><?php echo esc_html__('Redirection', 'lnky-short-links'); ?></th>
                         <th><?php echo esc_html__('Statut', 'lnky-short-links'); ?></th>
                         <th><?php echo esc_html__('Clics', 'lnky-short-links'); ?></th>
+                        <th><?php echo esc_html__('QR Code', 'lnky-short-links'); ?></th>
                         <th><?php echo esc_html__('Actions', 'lnky-short-links'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($links)) : ?>
                         <tr>
-                            <td colspan="7"><?php echo esc_html__('Aucun lien pour le moment.', 'lnky-short-links'); ?></td>
+                            <td colspan="8"><?php echo esc_html__('Aucun lien pour le moment.', 'lnky-short-links'); ?></td>
                         </tr>
                     <?php else : ?>
                         <?php foreach ($links as $link) : ?>
@@ -348,6 +360,26 @@ final class Lnky_Short_Links {
                                 <td><?php echo esc_html((string) $link['redirect_type']); ?></td>
                                 <td><?php echo $link['is_active'] ? esc_html__('Actif', 'lnky-short-links') : esc_html__('Inactif', 'lnky-short-links'); ?></td>
                                 <td><?php echo esc_html((string) $link['click_count']); ?></td>
+                                <td>
+                                    <?php $public_link_url = $this->build_public_link_url($link['slug']); ?>
+                                    <div class="lnky-qr-cell">
+                                        <div
+                                            class="lnky-qr-cell__image"
+                                            data-lnky-qr-canvas
+                                            data-lnky-qr-url="<?php echo esc_attr($public_link_url); ?>"
+                                            data-lnky-qr-size="72"
+                                            aria-label="<?php echo esc_attr(sprintf(__('QR code pour %s', 'lnky-short-links'), $public_link_url)); ?>"
+                                        ></div>
+                                        <button
+                                            type="button"
+                                            class="button button-small"
+                                            data-lnky-qr-open
+                                            data-lnky-qr-url="<?php echo esc_attr($public_link_url); ?>"
+                                        >
+                                            <?php echo esc_html__('Ouvrir', 'lnky-short-links'); ?>
+                                        </button>
+                                    </div>
+                                </td>
                                 <td>
                                     <a class="button button-small" href="<?php echo esc_url(admin_url('admin.php?page=' . self::ADD_MENU_SLUG . '&link_id=' . (int) $link['id'])); ?>">
                                         <?php echo esc_html__('Modifier', 'lnky-short-links'); ?>
@@ -538,6 +570,38 @@ final class Lnky_Short_Links {
                     <?php echo esc_html__('Host complet :', 'lnky-short-links'); ?>
                     <code><?php echo esc_html($this->get_public_host()); ?></code>
                 </p>
+            </div>
+
+            <div class="lnky-admin__card">
+                <h2><?php echo esc_html__('QR code du lien', 'lnky-short-links'); ?></h2>
+                <p><?php echo esc_html__('Un QR code est genere automatiquement a partir de l URL courte publique du lien.', 'lnky-short-links'); ?></p>
+                <?php $preview_public_link_url = $this->build_public_link_url($link['slug'] ?: 'slug-auto'); ?>
+                <div class="lnky-qr-preview">
+                    <div
+                        id="lnky_qr_preview_image"
+                        class="lnky-qr-preview__image"
+                        data-lnky-qr-canvas
+                        data-lnky-qr-url="<?php echo esc_attr($preview_public_link_url); ?>"
+                        data-lnky-qr-size="280"
+                        aria-label="<?php echo esc_attr__('Apercu du QR code du lien court', 'lnky-short-links'); ?>"
+                    ></div>
+                    <div class="lnky-qr-preview__meta">
+                        <p>
+                            <?php echo esc_html__('URL du lien court :', 'lnky-short-links'); ?><br>
+                            <code id="lnky_qr_preview_link"><?php echo esc_html($preview_public_link_url); ?></code>
+                        </p>
+                        <p>
+                            <a
+                                id="lnky_qr_preview_download"
+                                class="button button-secondary"
+                                href="#"
+                                download="lnky-qrcode.png"
+                            >
+                                <?php echo esc_html__('Telecharger le QR code', 'lnky-short-links'); ?>
+                            </a>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
         <?php
@@ -1365,6 +1429,30 @@ final class Lnky_Short_Links {
         $slug = $slug !== '' ? $slug : 'slug-auto';
 
         return $this->get_public_host() . '/' . ltrim($slug, '/');
+    }
+
+    private function build_public_link_url(string $slug): string {
+        return 'https://' . $this->build_public_link($slug);
+    }
+
+    private function get_qr_logo_url(): string {
+        $custom_logo_id = (int) get_theme_mod('custom_logo');
+
+        if ($custom_logo_id > 0) {
+            $custom_logo_url = wp_get_attachment_image_url($custom_logo_id, 'thumbnail');
+
+            if (is_string($custom_logo_url) && $custom_logo_url !== '') {
+                return $custom_logo_url;
+            }
+        }
+
+        $site_icon_url = get_site_icon_url(128);
+
+        if (is_string($site_icon_url) && $site_icon_url !== '') {
+            return $site_icon_url;
+        }
+
+        return plugin_dir_url(__FILE__) . 'assets/images/logo-lnky-short-links.png';
     }
 
     private function build_local_preview_link(string $slug): string {

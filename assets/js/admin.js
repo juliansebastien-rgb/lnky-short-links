@@ -16,6 +16,9 @@
         var basePathInput = document.getElementById('lnky_local_base_path');
         var livePublicPreview = document.getElementById('lnky_live_public_preview');
         var liveLocalPreview = document.getElementById('lnky_live_local_preview');
+        var qrPreviewImage = document.getElementById('lnky_qr_preview_image');
+        var qrPreviewLink = document.getElementById('lnky_qr_preview_link');
+        var qrPreviewDownload = document.getElementById('lnky_qr_preview_download');
         var settingsPublicPreview = document.getElementById('lnky_settings_public_preview');
         var settingsLocalPreview = document.getElementById('lnky_settings_local_preview');
         var searchInput = document.getElementById('lnky_internal_search');
@@ -29,6 +32,7 @@
         var selectedUrl = selectedItem ? selectedItem.querySelector('[data-lnky-selected-url]') : null;
         var searchAbort = null;
         var searchTimer = null;
+        var qrLogoImage = null;
 
         function toggleMode() {
             var mode = document.querySelector('input[name="target_mode"]:checked');
@@ -56,6 +60,89 @@
             return (value || '').replace(/\/+$/g, '');
         }
 
+        function loadQrLogo() {
+            if (!window.LnkyAdmin || !LnkyAdmin.qr || !LnkyAdmin.qr.logoUrl) {
+                return Promise.resolve(null);
+            }
+
+            return new Promise(function (resolve) {
+                var image = new Image();
+                image.crossOrigin = 'anonymous';
+                image.onload = function () {
+                    qrLogoImage = image;
+                    resolve(image);
+                };
+                image.onerror = function () {
+                    resolve(null);
+                };
+                image.src = LnkyAdmin.qr.logoUrl;
+            });
+        }
+
+        function drawQrInto(container, url, size) {
+            if (!container || !url || typeof qrcode !== 'function') {
+                return null;
+            }
+
+            var pixelSize = parseInt(size, 10) || 180;
+            var canvas = document.createElement('canvas');
+            var context = canvas.getContext('2d');
+            var qr = qrcode(0, 'H');
+            var cellSize;
+            var moduleCount;
+            var actualSize;
+            var logoPadding;
+            var logoSize;
+            var logoX;
+            var logoY;
+
+            if (!context) {
+                return null;
+            }
+
+            qr.addData(url);
+            qr.make();
+
+            moduleCount = qr.getModuleCount();
+            cellSize = Math.max(2, Math.floor(pixelSize / (moduleCount + 8)));
+            actualSize = cellSize * (moduleCount + 8);
+
+            canvas.width = actualSize;
+            canvas.height = actualSize;
+
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, actualSize, actualSize);
+            qr.renderTo2dContext(context, cellSize);
+
+            if (qrLogoImage) {
+                logoPadding = Math.round(actualSize * 0.04);
+                logoSize = Math.round(actualSize * 0.18);
+                logoX = Math.round((actualSize - logoSize) / 2);
+                logoY = Math.round((actualSize - logoSize) / 2);
+
+                context.fillStyle = '#ffffff';
+                context.fillRect(logoX - logoPadding, logoY - logoPadding, logoSize + (logoPadding * 2), logoSize + (logoPadding * 2));
+                context.drawImage(qrLogoImage, logoX, logoY, logoSize, logoSize);
+            }
+
+            container.innerHTML = '';
+            container.appendChild(canvas);
+
+            return canvas;
+        }
+
+        function renderAllQRCodes() {
+            document.querySelectorAll('[data-lnky-qr-canvas]').forEach(function (container) {
+                var url = container.getAttribute('data-lnky-qr-url') || '';
+                var size = container.getAttribute('data-lnky-qr-size') || '180';
+                var canvas = drawQrInto(container, url, size);
+
+                if (container.id === 'lnky_qr_preview_image' && canvas && qrPreviewDownload) {
+                    qrPreviewDownload.href = canvas.toDataURL('image/png');
+                }
+            });
+        }
+
         function updateLinkPreviews() {
             if (!livePublicPreview && !liveLocalPreview) {
                 return;
@@ -65,6 +152,7 @@
             var domain = livePublicPreview ? (livePublicPreview.getAttribute('data-lnky-preview-domain') || 'lnky.fr') : 'lnky.fr';
             var subdomain = livePublicPreview ? sanitizePart(livePublicPreview.getAttribute('data-lnky-preview-subdomain') || '', '') : '';
             var host = subdomain ? subdomain + '.' + domain : domain;
+            var publicUrl = 'https://' + host + '/' + slug;
 
             if (livePublicPreview) {
                 livePublicPreview.textContent = host + '/' + slug;
@@ -74,6 +162,22 @@
                 var basePath = trimSlashes(liveLocalPreview.getAttribute('data-lnky-preview-base-path') || 'lnky');
                 var home = trimTrailingSlashes(liveLocalPreview.getAttribute('data-lnky-preview-home') || '');
                 liveLocalPreview.textContent = home + '/' + basePath + '/' + slug + '/';
+            }
+
+            if (qrPreviewLink) {
+                qrPreviewLink.textContent = publicUrl;
+            }
+
+            if (qrPreviewImage) {
+                qrPreviewImage.setAttribute('data-lnky-qr-url', publicUrl);
+                drawQrInto(qrPreviewImage, publicUrl, qrPreviewImage.getAttribute('data-lnky-qr-size') || '280');
+            }
+
+            if (qrPreviewDownload) {
+                var previewCanvas = qrPreviewImage ? qrPreviewImage.querySelector('canvas') : null;
+                if (previewCanvas) {
+                    qrPreviewDownload.href = previewCanvas.toDataURL('image/png');
+                }
             }
         }
 
@@ -212,7 +316,6 @@
         toggleMode();
         renderSelected(labelInput ? labelInput.value : '', urlInput ? urlInput.value : '');
         updateSettingsPreviews();
-        updateLinkPreviews();
 
         if (slugInput) {
             slugInput.addEventListener('input', updateLinkPreviews);
@@ -247,5 +350,29 @@
                 }
             });
         }
+
+        document.querySelectorAll('[data-lnky-qr-open]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var url = button.getAttribute('data-lnky-qr-url') || '';
+                var temp = document.createElement('div');
+                var canvas = drawQrInto(temp, url, 512);
+                var opened;
+
+                if (!canvas) {
+                    return;
+                }
+
+                opened = window.open('', '_blank');
+                if (opened) {
+                    opened.document.write('<img src="' + canvas.toDataURL('image/png') + '" alt="QR code">');
+                    opened.document.close();
+                }
+            });
+        });
+
+        loadQrLogo().then(function () {
+            renderAllQRCodes();
+            updateLinkPreviews();
+        });
     });
 })();
