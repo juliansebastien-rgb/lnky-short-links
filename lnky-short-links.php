@@ -3,7 +3,7 @@
  * Plugin Name: Lnky Short Links
  * Plugin URI: https://github.com/juliansebastien-rgb/lnky-short-links
  * Description: Cree des liens courts avec slugs personnalises, destinations externes ou contenus WordPress, et redirections trackees.
- * Version: 0.1.8
+ * Version: 0.1.9
  * Author: Le Labo d'Azertaf
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Lnky_Short_Links {
-    private const VERSION = '0.1.8';
+    private const VERSION = '0.1.9';
     private const OPTION_KEY = 'lnky_short_links_settings';
     private const TRANSIENT_PREFIX = 'lnky_short_links_';
     private const GITHUB_REPOSITORY = 'juliansebastien-rgb/lnky-short-links';
@@ -28,6 +28,7 @@ final class Lnky_Short_Links {
     private const QUERY_VAR = 'lnky_slug';
     private const MENU_SLUG = 'lnky-short-links';
     private const ADD_MENU_SLUG = 'lnky-short-links-add';
+    private const STATS_MENU_SLUG = 'lnky-short-links-stats';
     private const SETTINGS_MENU_SLUG = 'lnky-short-links-settings';
 
     public function boot(): void {
@@ -39,6 +40,7 @@ final class Lnky_Short_Links {
         add_action('template_redirect', [$this, 'maybe_handle_redirect'], 0);
 
         add_action('admin_menu', [$this, 'register_admin_pages']);
+        add_action('admin_init', [$this, 'maybe_upgrade_schema']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
         add_action('wp_ajax_lnky_search_content', [$this, 'ajax_search_content']);
 
@@ -66,6 +68,14 @@ final class Lnky_Short_Links {
 
     public function deactivate(): void {
         flush_rewrite_rules();
+    }
+
+    public function maybe_upgrade_schema(): void {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $this->create_links_table();
     }
 
     public function register_rewrite_rules(): void {
@@ -109,6 +119,15 @@ final class Lnky_Short_Links {
 
         add_submenu_page(
             self::MENU_SLUG,
+            __('Statistiques Lnky', 'lnky-short-links'),
+            __('Statistiques', 'lnky-short-links'),
+            'manage_options',
+            self::STATS_MENU_SLUG,
+            [$this, 'render_stats_page']
+        );
+
+        add_submenu_page(
+            self::MENU_SLUG,
             __('Ajouter un lien', 'lnky-short-links'),
             __('Ajouter', 'lnky-short-links'),
             'manage_options',
@@ -130,6 +149,7 @@ final class Lnky_Short_Links {
         $allowed_hooks = [
             'toplevel_page_' . self::MENU_SLUG,
             'lnky-links_page_' . self::ADD_MENU_SLUG,
+            'lnky-links_page_' . self::STATS_MENU_SLUG,
             'lnky-links_page_' . self::SETTINGS_MENU_SLUG,
         ];
 
@@ -311,6 +331,7 @@ final class Lnky_Short_Links {
         }
 
         $links = $this->get_links();
+        $stats = $this->get_link_stats();
         ?>
         <div class="wrap lnky-admin">
             <?php $this->render_admin_brand(__('Lnky Links', 'lnky-short-links'), __('Gere tes liens courts, tes destinations et tes clics depuis WordPress.', 'lnky-short-links')); ?>
@@ -326,6 +347,25 @@ final class Lnky_Short_Links {
                 </a>
             </div>
 
+            <div class="lnky-admin__stats-grid">
+                <div class="lnky-admin__stat-card">
+                    <span class="lnky-admin__stat-label"><?php echo esc_html__('Liens', 'lnky-short-links'); ?></span>
+                    <strong class="lnky-admin__stat-value"><?php echo esc_html(number_format_i18n($stats['total_links'])); ?></strong>
+                </div>
+                <div class="lnky-admin__stat-card">
+                    <span class="lnky-admin__stat-label"><?php echo esc_html__('Liens actifs', 'lnky-short-links'); ?></span>
+                    <strong class="lnky-admin__stat-value"><?php echo esc_html(number_format_i18n($stats['active_links'])); ?></strong>
+                </div>
+                <div class="lnky-admin__stat-card">
+                    <span class="lnky-admin__stat-label"><?php echo esc_html__('Clics totaux', 'lnky-short-links'); ?></span>
+                    <strong class="lnky-admin__stat-value"><?php echo esc_html(number_format_i18n($stats['total_clicks'])); ?></strong>
+                </div>
+                <div class="lnky-admin__stat-card">
+                    <span class="lnky-admin__stat-label"><?php echo esc_html__('Moyenne par lien', 'lnky-short-links'); ?></span>
+                    <strong class="lnky-admin__stat-value"><?php echo esc_html(number_format_i18n($stats['average_clicks'], 1)); ?></strong>
+                </div>
+            </div>
+
             <table class="widefat fixed striped">
                 <thead>
                     <tr>
@@ -335,6 +375,7 @@ final class Lnky_Short_Links {
                         <th><?php echo esc_html__('Redirection', 'lnky-short-links'); ?></th>
                         <th><?php echo esc_html__('Statut', 'lnky-short-links'); ?></th>
                         <th><?php echo esc_html__('Clics', 'lnky-short-links'); ?></th>
+                        <th><?php echo esc_html__('Dernier clic', 'lnky-short-links'); ?></th>
                         <th><?php echo esc_html__('QR Code', 'lnky-short-links'); ?></th>
                         <th><?php echo esc_html__('Actions', 'lnky-short-links'); ?></th>
                     </tr>
@@ -342,7 +383,7 @@ final class Lnky_Short_Links {
                 <tbody>
                     <?php if (empty($links)) : ?>
                         <tr>
-                            <td colspan="8"><?php echo esc_html__('Aucun lien pour le moment.', 'lnky-short-links'); ?></td>
+                            <td colspan="9"><?php echo esc_html__('Aucun lien pour le moment.', 'lnky-short-links'); ?></td>
                         </tr>
                     <?php else : ?>
                         <?php foreach ($links as $link) : ?>
@@ -360,6 +401,7 @@ final class Lnky_Short_Links {
                                 <td><?php echo esc_html((string) $link['redirect_type']); ?></td>
                                 <td><?php echo $link['is_active'] ? esc_html__('Actif', 'lnky-short-links') : esc_html__('Inactif', 'lnky-short-links'); ?></td>
                                 <td><?php echo esc_html((string) $link['click_count']); ?></td>
+                                <td><?php echo esc_html($this->format_datetime_or_placeholder($link['last_clicked_at'] ?? '')); ?></td>
                                 <td>
                                     <?php $public_link_url = $this->build_public_link_url($link['slug']); ?>
                                     <div class="lnky-qr-cell">
@@ -397,6 +439,101 @@ final class Lnky_Short_Links {
                     <?php endif; ?>
                 </tbody>
             </table>
+        </div>
+        <?php
+    }
+
+    public function render_stats_page(): void {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $stats = $this->get_link_stats();
+        $top_links = $this->get_top_links(8);
+        $recent_links = $this->get_recent_links(8);
+        ?>
+        <div class="wrap lnky-admin">
+            <?php $this->render_admin_brand(__('Statistiques Lnky', 'lnky-short-links'), __('Suis les performances de base de tes liens courts depuis WordPress.', 'lnky-short-links')); ?>
+            <?php $this->render_admin_notices(); ?>
+
+            <div class="lnky-admin__stats-grid">
+                <div class="lnky-admin__stat-card">
+                    <span class="lnky-admin__stat-label"><?php echo esc_html__('Liens crees', 'lnky-short-links'); ?></span>
+                    <strong class="lnky-admin__stat-value"><?php echo esc_html(number_format_i18n($stats['total_links'])); ?></strong>
+                </div>
+                <div class="lnky-admin__stat-card">
+                    <span class="lnky-admin__stat-label"><?php echo esc_html__('Liens actifs', 'lnky-short-links'); ?></span>
+                    <strong class="lnky-admin__stat-value"><?php echo esc_html(number_format_i18n($stats['active_links'])); ?></strong>
+                </div>
+                <div class="lnky-admin__stat-card">
+                    <span class="lnky-admin__stat-label"><?php echo esc_html__('Clics totaux', 'lnky-short-links'); ?></span>
+                    <strong class="lnky-admin__stat-value"><?php echo esc_html(number_format_i18n($stats['total_clicks'])); ?></strong>
+                </div>
+                <div class="lnky-admin__stat-card">
+                    <span class="lnky-admin__stat-label"><?php echo esc_html__('Meilleur lien', 'lnky-short-links'); ?></span>
+                    <strong class="lnky-admin__stat-value lnky-admin__stat-value--small"><?php echo esc_html($stats['best_slug'] ?: __('Aucun', 'lnky-short-links')); ?></strong>
+                </div>
+            </div>
+
+            <div class="lnky-admin__stats-layout">
+                <div class="lnky-admin__card">
+                    <h2><?php echo esc_html__('Top liens', 'lnky-short-links'); ?></h2>
+                    <table class="widefat striped">
+                        <thead>
+                            <tr>
+                                <th><?php echo esc_html__('Lien court', 'lnky-short-links'); ?></th>
+                                <th><?php echo esc_html__('Clics', 'lnky-short-links'); ?></th>
+                                <th><?php echo esc_html__('Dernier clic', 'lnky-short-links'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($top_links)) : ?>
+                                <tr>
+                                    <td colspan="3"><?php echo esc_html__('Pas encore de donnees de clics.', 'lnky-short-links'); ?></td>
+                                </tr>
+                            <?php else : ?>
+                                <?php foreach ($top_links as $link) : ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?php echo esc_html($this->build_public_link($link['slug'])); ?></strong>
+                                        </td>
+                                        <td><?php echo esc_html(number_format_i18n((int) $link['click_count'])); ?></td>
+                                        <td><?php echo esc_html($this->format_datetime_or_placeholder($link['last_clicked_at'] ?? '')); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="lnky-admin__card">
+                    <h2><?php echo esc_html__('Liens recents', 'lnky-short-links'); ?></h2>
+                    <table class="widefat striped">
+                        <thead>
+                            <tr>
+                                <th><?php echo esc_html__('Lien court', 'lnky-short-links'); ?></th>
+                                <th><?php echo esc_html__('Cree le', 'lnky-short-links'); ?></th>
+                                <th><?php echo esc_html__('Statut', 'lnky-short-links'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($recent_links)) : ?>
+                                <tr>
+                                    <td colspan="3"><?php echo esc_html__('Aucun lien pour le moment.', 'lnky-short-links'); ?></td>
+                                </tr>
+                            <?php else : ?>
+                                <?php foreach ($recent_links as $link) : ?>
+                                    <tr>
+                                        <td><strong><?php echo esc_html($this->build_public_link($link['slug'])); ?></strong></td>
+                                        <td><?php echo esc_html($this->format_datetime_or_placeholder($link['created_at'] ?? '')); ?></td>
+                                        <td><?php echo $link['is_active'] ? esc_html__('Actif', 'lnky-short-links') : esc_html__('Inactif', 'lnky-short-links'); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         <?php
     }
@@ -993,7 +1130,14 @@ final class Lnky_Short_Links {
         global $wpdb;
 
         $table = $this->get_links_table_name();
-        $wpdb->query($wpdb->prepare("UPDATE {$table} SET click_count = click_count + 1 WHERE id = %d", $link_id));
+        $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$table} SET click_count = click_count + 1, last_clicked_at = %s, updated_at = %s WHERE id = %d",
+                current_time('mysql', true),
+                current_time('mysql', true),
+                $link_id
+            )
+        );
     }
 
     private function get_links_table_name(): string {
@@ -1019,6 +1163,7 @@ final class Lnky_Short_Links {
             redirect_type SMALLINT UNSIGNED NOT NULL DEFAULT 302,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             click_count BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            last_clicked_at DATETIME NULL DEFAULT NULL,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             PRIMARY KEY  (id),
@@ -1479,6 +1624,69 @@ final class Lnky_Short_Links {
         $result = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $link_id), ARRAY_A);
 
         return is_array($result) ? $result : null;
+    }
+
+    private function get_link_stats(): array {
+        global $wpdb;
+
+        $table = $this->get_links_table_name();
+        $row = $wpdb->get_row(
+            "SELECT
+                COUNT(*) AS total_links,
+                SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_links,
+                COALESCE(SUM(click_count), 0) AS total_clicks,
+                MAX(click_count) AS max_clicks
+            FROM {$table}",
+            ARRAY_A
+        );
+
+        $best_slug = (string) $wpdb->get_var("SELECT slug FROM {$table} ORDER BY click_count DESC, created_at DESC LIMIT 1");
+
+        $total_links = isset($row['total_links']) ? (int) $row['total_links'] : 0;
+        $active_links = isset($row['active_links']) ? (int) $row['active_links'] : 0;
+        $total_clicks = isset($row['total_clicks']) ? (int) $row['total_clicks'] : 0;
+
+        return [
+            'total_links' => $total_links,
+            'active_links' => $active_links,
+            'total_clicks' => $total_clicks,
+            'average_clicks' => $total_links > 0 ? $total_clicks / $total_links : 0,
+            'best_slug' => $best_slug,
+        ];
+    }
+
+    private function get_top_links(int $limit = 5): array {
+        global $wpdb;
+
+        $table = $this->get_links_table_name();
+        $limit = max(1, min(20, $limit));
+        $results = $wpdb->get_results("SELECT * FROM {$table} ORDER BY click_count DESC, created_at DESC LIMIT {$limit}", ARRAY_A);
+
+        return is_array($results) ? $results : [];
+    }
+
+    private function get_recent_links(int $limit = 5): array {
+        global $wpdb;
+
+        $table = $this->get_links_table_name();
+        $limit = max(1, min(20, $limit));
+        $results = $wpdb->get_results("SELECT * FROM {$table} ORDER BY created_at DESC LIMIT {$limit}", ARRAY_A);
+
+        return is_array($results) ? $results : [];
+    }
+
+    private function format_datetime_or_placeholder(string $value): string {
+        if ($value === '' || $value === '0000-00-00 00:00:00') {
+            return __('Jamais', 'lnky-short-links');
+        }
+
+        $timestamp = mysql2date('U', $value, false);
+
+        if (!$timestamp) {
+            return __('Jamais', 'lnky-short-links');
+        }
+
+        return wp_date('d/m/Y H:i', $timestamp);
     }
 
     private function get_link_by_slug(string $slug): ?array {

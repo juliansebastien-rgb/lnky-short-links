@@ -41,6 +41,45 @@
     gap: 16px;
 }
 
+.lnky-admin__stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin: 18px 0;
+}
+
+.lnky-admin__stat-card {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 12px;
+    padding: 18px;
+}
+
+.lnky-admin__stat-label {
+    display: block;
+    color: #50575e;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.lnky-admin__stat-value {
+    display: block;
+    font-size: 28px;
+    line-height: 1.1;
+}
+
+.lnky-admin__stat-value--small {
+    font-size: 18px;
+    word-break: break-word;
+}
+
+.lnky-admin__stats-layout {
+    display: grid;
+    grid-template-columns: 1.2fr .8fr;
+    gap: 18px;
+    align-items: start;
+}
+
 .lnky-admin__form .form-table th {
     width: 220px;
 }
@@ -164,6 +203,12 @@
     .lnky-admin__brand {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .lnky-admin__hero,
+    .lnky-admin__stats-layout {
+        flex-direction: column;
+        grid-template-columns: 1fr;
     }
 
     .lnky-qr-preview {
